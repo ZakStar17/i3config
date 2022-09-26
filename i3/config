@@ -83,7 +83,7 @@ bindsym $mod+Shift+Up move up
 bindsym $mod+Shift+Right move right
 
 # split in horizontal orientation
-bindsym $mod+b split h
+bindsym $mod+c split h
 
 # split in vertical orientation
 bindsym $mod+v split v
@@ -250,3 +250,5 @@ exec --no-startup-id watch -n 30 sh ~/scripts/notify-battery.sh
 # enhancer script commands
 bindsym $mod+Tab exec enhanced workspace tab
 bindsym Super_L exec enhanced super
+bindsym $mod+Ctrl+Right exec enhanced workspace next
+bindsym $mod+Ctrl+Left exec enhanced workspace previous

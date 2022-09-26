@@ -9,6 +9,8 @@ struct Program {
   connection: I3Connection,
   workspaces: LinkedHashSet<String>,
   workspace_tab_stack: Option<Vec<String>>,
+  // When moving horizontally, remembers current workspace
+  workspace_cur_hor: Option<usize>,
 }
 
 impl Program {
@@ -19,6 +21,7 @@ impl Program {
       connection,
       workspaces,
       workspace_tab_stack: None,
+      workspace_cur_hor: None,
     }
   }
 
@@ -63,30 +66,49 @@ impl Program {
               .insert(self.workspaces.iter().nth(stack.len()).unwrap().clone());
             self.workspace_tab_stack = None;
           }
+          if let Some(cur) = self.workspace_cur_hor {
+            self.workspaces.insert(cur.to_string());
+            self.workspace_cur_hor = None;
+          }
           return;
-        } else if words[2] == "workspace" && words[3] == "tab" {
-          if self.workspaces.len() > 1 {
-            let tabbed_workspace: String = if let Some(stack) = &mut self.workspace_tab_stack {
-              if let Some(popped) = stack.pop() {
-                popped
+        } else if words[2] == "workspace" {
+          if words[3] == "tab" {
+            if self.workspaces.len() > 1 {
+              let tabbed_workspace: String = if let Some(stack) = &mut self.workspace_tab_stack {
+                if let Some(popped) = stack.pop() {
+                  popped
+                } else {
+                  // reset stack and pop the first workspace
+                  let mut stack: Vec<String> = self.workspaces.iter().map(|s| s.clone()).collect();
+                  let popped = stack.pop().unwrap();
+                  self.workspace_tab_stack = Some(stack);
+                  popped
+                }
               } else {
-                // reset stack and pop the first workspace
                 let mut stack: Vec<String> = self.workspaces.iter().map(|s| s.clone()).collect();
+                stack.pop().unwrap(); // pop the current workspace
                 let popped = stack.pop().unwrap();
                 self.workspace_tab_stack = Some(stack);
                 popped
-              }
+              };
+              self
+                .connection
+                .run_command(&format!("workspace number \"{}\"", tabbed_workspace))
+                .unwrap();
+            }
+          } else if words[3] == "next" || words[3] == "previous" {
+            let cur = if let Some(cur) = self.workspace_cur_hor {
+              Ok(cur)
             } else {
-              let mut stack: Vec<String> = self.workspaces.iter().map(|s| s.clone()).collect();
-              stack.pop().unwrap(); // pop the current workspace
-              let popped = stack.pop().unwrap();
-              self.workspace_tab_stack = Some(stack);
-              popped
+              let current_workspace = self.workspaces.back().unwrap().clone();
+              current_workspace.parse::<usize>()
             };
-            self
-              .connection
-              .run_command(&format!("workspace number \"{}\"", tabbed_workspace))
-              .unwrap();
+
+            if let Ok(cur) = cur {
+              let to = if words[3] == "next" { cur + 1 } else { cur - 1 };
+              self.go_to_workspace(&to.to_string());
+              self.workspace_cur_hor = Some(to);
+            }
           }
         }
       }
@@ -95,6 +117,18 @@ impl Program {
         self.workspaces.insert(words[2].to_string());
       }
     }
+  }
+
+  fn go_to_workspace(&mut self, name: &str) {
+    self
+      .connection
+      .run_command(&format!("workspace number \"{}\"", name))
+      .unwrap();
+  }
+
+  fn remember_and_go_to_wokspace(&mut self, name: String) {
+    self.go_to_workspace(&name);
+    self.workspaces.insert(name);
   }
 }
 
